@@ -45,8 +45,6 @@ func applyDefaultMigrations(ctx context.Context, pool *pgxpool.Pool) error {
 		if err != nil {
 			return fmt.Errorf("failed to execute migration #%d: %w", i+1, err)
 		}
-
-		fmt.Printf("Applied migration #%d\n", i+1)
 	}
 
 	return nil

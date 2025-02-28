@@ -122,7 +122,7 @@ func CloseTestDB(ctx context.Context, db *DB) {
 }
 
 // PopulateTestData populates a table with test data for testing purposes
-func PopulateTestData(db *DB, tableName string, data interface{}) error {
+func PopulateTestData(db *DB, tableName string, data any) error {
 	val := reflect.ValueOf(data)
 	if val.Kind() != reflect.Slice {
 		return fmt.Errorf("expected slice, got %T", data)
@@ -144,7 +144,7 @@ func PopulateTestData(db *DB, tableName string, data interface{}) error {
 	}
 
 	var fields []string
-	for i := 0; i < elemType.NumField(); i++ {
+	for i := range elemType.NumField() {
 		field := elemType.Field(i)
 		dbTag := field.Tag.Get("db")
 		if dbTag == "" || dbTag == "-" {
@@ -164,12 +164,12 @@ func PopulateTestData(db *DB, tableName string, data interface{}) error {
 	sb.WriteString(") VALUES ")
 
 	placeholderGroups := make([]string, val.Len())
-	args := make([]interface{}, 0, val.Len()*len(fields))
+	args := make([]any, 0, val.Len()*len(fields))
 
-	for i := 0; i < val.Len(); i++ {
+	for i := range val.Len() {
 		paramOffset := i * len(fields)
 		placeholders := make([]string, len(fields))
-		for j := 0; j < len(fields); j++ {
+		for j := range fields {
 			placeholders[j] = fmt.Sprintf("$%d", paramOffset+j+1)
 
 			// Extract field value

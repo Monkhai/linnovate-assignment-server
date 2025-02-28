@@ -55,3 +55,26 @@ func TestGetProducts(t *testing.T) {
 		assert.Equal(t, tp.Price, p.Price)
 	}
 }
+
+func TestGetProduct(t *testing.T) {
+	db, cleanup := setupEmptyDB(t)
+	defer cleanup()
+
+	testProducts := []Product{
+		{ID: 1, Name: "Test Product 1", Price: 19.99},
+		{ID: 2, Name: "Test Product 2", Price: 29.99},
+		{ID: 3, Name: "Test Product 3", Price: 39.99},
+	}
+
+	err := PopulateTestData(db, "products", testProducts)
+	require.NoError(t, err)
+
+	for _, tp := range testProducts {
+		p, err := db.GetProduct(tp.ID)
+		require.NoError(t, err)
+
+		assert.Equal(t, tp.ID, p.ID)
+		assert.Equal(t, tp.Name, p.Name)
+		assert.Equal(t, tp.Price, p.Price)
+	}
+}
