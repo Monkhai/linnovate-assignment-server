@@ -96,6 +96,32 @@ func (db *DB) PostReview(review UserReview) error {
 	return nil
 }
 
+func (db *DB) GetProductReviews(productId int64) ([]Review, error) {
+	rows, err := db.client.Query(db.ctx, `
+	SELECT * FROM reviews WHERE product_id = $1
+	`, productId)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+	var reviews []Review
+	for rows.Next() {
+		review, err := pgx.RowToStructByName[Review](rows)
+		if err != nil {
+			return nil, err
+		}
+		reviews = append(reviews, review)
+	}
+	return reviews, nil
+
+}
+
+// ===========================================
+// =================HELPERS===================
+// ===========================================
+
 func (db *DB) getReview(id int64) (Review, error) {
 	rows, err := db.client.Query(db.ctx, "SELECT * FROM reviews WHERE id = $1", id)
 	if err != nil {

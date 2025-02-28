@@ -87,19 +87,83 @@ func TestPostReview(t *testing.T) {
 	err := PopulateTestData(db, "products", testProducts)
 	require.NoError(t, err)
 
-	reviews := []Review{
+	testReviews := []Review{
 		{ID: 1, UserId: "1", ProductID: 1, ReviewTitle: "Title 1", ReviewContent: "Content 1", Stars: 1},
 		{ID: 2, UserId: "2", ProductID: 2, ReviewTitle: "Title 2", ReviewContent: "Content 2", Stars: 2},
 		{ID: 3, UserId: "3", ProductID: 3, ReviewTitle: "Title 3", ReviewContent: "Content 3", Stars: 3},
 	}
 
-	for _, tr := range reviews {
+	for _, tr := range testReviews {
 		err := db.PostReview(UserReview{UserId: tr.UserId, ProductID: tr.ProductID, ReviewTitle: tr.ReviewTitle, ReviewContent: tr.ReviewContent, Stars: tr.Stars})
 		require.NoError(t, err)
 		r, err := db.getReview(tr.ID)
 		require.NoError(t, err)
 		validateReview(t, r, tr)
 	}
+}
+
+func TestGetProductReviews(t *testing.T) {
+	db, cleanup := setupEmptyDB(t)
+	defer cleanup()
+
+	testProducts := []Product{
+		{ID: 1, Name: "Test Product 1", Price: 19.99},
+		{ID: 2, Name: "Test Product 2", Price: 29.99},
+		{ID: 3, Name: "Test Product 3", Price: 39.99},
+	}
+
+	err := PopulateTestData(db, "products", testProducts)
+	require.NoError(t, err)
+
+	testReviews := []Review{
+		{ID: 1, UserId: "1", ProductID: 1, ReviewTitle: "Title 1", ReviewContent: "Content 1", Stars: 1},
+		{ID: 2, UserId: "1", ProductID: 1, ReviewTitle: "Title 2", ReviewContent: "Content 2", Stars: 2},
+		{ID: 3, UserId: "1", ProductID: 2, ReviewTitle: "Title 3", ReviewContent: "Content 3", Stars: 3},
+		{ID: 4, UserId: "1", ProductID: 2, ReviewTitle: "Title 4", ReviewContent: "Content 4", Stars: 1},
+		{ID: 5, UserId: "1", ProductID: 3, ReviewTitle: "Title 5", ReviewContent: "Content 5", Stars: 2},
+		{ID: 6, UserId: "1", ProductID: 3, ReviewTitle: "Title 6", ReviewContent: "Content 6", Stars: 3},
+	}
+
+	err = PopulateTestData(db, "reviews", testReviews)
+	require.NoError(t, err)
+
+	tests := []struct {
+		productId int64
+		expected  []Review
+	}{
+		{
+			productId: 1,
+			expected: []Review{
+				{ID: 1, UserId: "1", ProductID: 1, ReviewTitle: "Title 1", ReviewContent: "Content 1", Stars: 1},
+				{ID: 2, UserId: "1", ProductID: 1, ReviewTitle: "Title 2", ReviewContent: "Content 2", Stars: 2},
+			},
+		},
+		{
+			productId: 2,
+			expected: []Review{
+				{ID: 3, UserId: "1", ProductID: 2, ReviewTitle: "Title 3", ReviewContent: "Content 3", Stars: 3},
+				{ID: 4, UserId: "1", ProductID: 2, ReviewTitle: "Title 4", ReviewContent: "Content 4", Stars: 1},
+			},
+		},
+		{
+			productId: 3,
+			expected: []Review{
+				{ID: 5, UserId: "1", ProductID: 3, ReviewTitle: "Title 5", ReviewContent: "Content 5", Stars: 2},
+				{ID: 6, UserId: "1", ProductID: 3, ReviewTitle: "Title 6", ReviewContent: "Content 6", Stars: 3},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		reviews, err := db.GetProductReviews(tt.productId)
+		require.NoError(t, err)
+		assert.Len(t, reviews, len(tt.expected))
+		for i, r := range reviews {
+			tr := tt.expected[i]
+			validateReview(t, r, tr)
+		}
+	}
+
 }
 
 // ===========================================
