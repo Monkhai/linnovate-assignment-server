@@ -11,7 +11,6 @@ import (
 
 type DB struct {
 	client *pgxpool.Pool
-	ctx    context.Context
 }
 
 type Product struct {
@@ -39,8 +38,8 @@ type UserReview struct {
 	Stars         float64 `json:"stars"`
 }
 
-func New(ctx context.Context, client *pgxpool.Pool) *DB {
-	return &DB{ctx: ctx, client: client}
+func New(client *pgxpool.Pool) *DB {
+	return &DB{client: client}
 }
 
 func (db *DB) Close(ctx context.Context) {
@@ -49,8 +48,8 @@ func (db *DB) Close(ctx context.Context) {
 	}
 }
 
-func (db *DB) GetProducts() ([]Product, error) {
-	rows, err := db.client.Query(db.ctx, "SELECT * FROM products ORDER BY $1", "id")
+func (db *DB) GetProducts(ctx context.Context) ([]Product, error) {
+	rows, err := db.client.Query(ctx, "SELECT * FROM products ORDER BY $1", "id")
 	if err != nil {
 		return nil, fmt.Errorf("failed to query products: %w", err)
 	}
@@ -67,8 +66,8 @@ func (db *DB) GetProducts() ([]Product, error) {
 	return products, nil
 }
 
-func (db *DB) GetProduct(id int64) (Product, error) {
-	rows, err := db.client.Query(db.ctx, "SELECT id, name, price, created_at FROM products WHERE id = $1", id)
+func (db *DB) GetProduct(ctx context.Context, id int64) (Product, error) {
+	rows, err := db.client.Query(ctx, "SELECT id, name, price, created_at FROM products WHERE id = $1", id)
 	if err != nil {
 		return Product{}, fmt.Errorf("failed to query product: %w", err)
 	}
@@ -85,8 +84,8 @@ func (db *DB) GetProduct(id int64) (Product, error) {
 	return product, nil
 }
 
-func (db *DB) PostReview(review UserReview) error {
-	_, err := db.client.Exec(db.ctx,
+func (db *DB) PostReview(ctx context.Context, review UserReview) error {
+	_, err := db.client.Exec(ctx,
 		`INSERT INTO reviews (user_id, product_id, review_title, review_content, stars) 
 		VALUES ($1, $2, $3, $4, $5)`,
 		review.UserId, review.ProductID, review.ReviewTitle, review.ReviewContent, review.Stars)
@@ -96,8 +95,8 @@ func (db *DB) PostReview(review UserReview) error {
 	return nil
 }
 
-func (db *DB) GetProductReviews(productId int64) ([]Review, error) {
-	rows, err := db.client.Query(db.ctx, `
+func (db *DB) GetProductReviews(ctx context.Context, productId int64) ([]Review, error) {
+	rows, err := db.client.Query(ctx, `
 	SELECT * FROM reviews WHERE product_id = $1
 	`, productId)
 
@@ -122,8 +121,8 @@ func (db *DB) GetProductReviews(productId int64) ([]Review, error) {
 // =================HELPERS===================
 // ===========================================
 
-func (db *DB) getReview(id int64) (Review, error) {
-	rows, err := db.client.Query(db.ctx, "SELECT * FROM reviews WHERE id = $1", id)
+func (db *DB) getReview(ctx context.Context, id int64) (Review, error) {
+	rows, err := db.client.Query(ctx, "SELECT * FROM reviews WHERE id = $1", id)
 	if err != nil {
 		return Review{}, fmt.Errorf("failed to query product: %w", err)
 	}

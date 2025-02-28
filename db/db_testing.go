@@ -95,7 +95,7 @@ func NewTestDB(ctx context.Context) (*DB, error) {
 	}
 
 	// Create a regular DB instance
-	db := New(ctx, client)
+	db := New(client)
 
 	// Track the container for later cleanup
 	testContainers[db] = &testContainer{container: container}
@@ -122,7 +122,7 @@ func CloseTestDB(ctx context.Context, db *DB) {
 }
 
 // PopulateTestData populates a table with test data for testing purposes
-func PopulateTestData(db *DB, tableName string, data any) error {
+func PopulateTestData(ctx context.Context, db *DB, tableName string, data any) error {
 	val := reflect.ValueOf(data)
 	if val.Kind() != reflect.Slice {
 		return fmt.Errorf("expected slice, got %T", data)
@@ -131,11 +131,11 @@ func PopulateTestData(db *DB, tableName string, data any) error {
 		return nil
 	}
 
-	tx, err := db.client.Begin(db.ctx)
+	tx, err := db.client.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback(db.ctx)
+	defer tx.Rollback(ctx)
 
 	elem := val.Index(0).Interface()
 	elemType := reflect.TypeOf(elem)
@@ -181,12 +181,12 @@ func PopulateTestData(db *DB, tableName string, data any) error {
 
 	sb.WriteString(strings.Join(placeholderGroups, ", "))
 
-	_, err = tx.Exec(db.ctx, sb.String(), args...)
+	_, err = tx.Exec(ctx, sb.String(), args...)
 	if err != nil {
 		return fmt.Errorf("failed to insert data: %w", err)
 	}
 
-	err = tx.Commit(db.ctx)
+	err = tx.Commit(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}

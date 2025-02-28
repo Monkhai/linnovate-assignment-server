@@ -10,7 +10,7 @@ import (
 
 // Fixed time for testing to ensure deterministic results
 
-func setupEmptyDB(t *testing.T) (*DB, func()) {
+func setupEmptyDB(t *testing.T) (*DB, func(), context.Context) {
 	t.Helper()
 	ctx := context.Background()
 
@@ -21,18 +21,18 @@ func setupEmptyDB(t *testing.T) (*DB, func()) {
 		CloseTestDB(ctx, db)
 	}
 
-	return db, cleanup
+	return db, cleanup, ctx
 }
 
 func TestDB_Connection(t *testing.T) {
-	db, cleanup := setupEmptyDB(t)
+	db, cleanup, ctx := setupEmptyDB(t)
 	defer cleanup()
-	err := db.client.Ping(context.Background())
+	err := db.client.Ping(ctx)
 	require.NoError(t, err)
 }
 
 func TestGetProducts(t *testing.T) {
-	db, cleanup := setupEmptyDB(t)
+	db, cleanup, ctx := setupEmptyDB(t)
 	defer cleanup()
 
 	testProducts := []Product{
@@ -41,10 +41,10 @@ func TestGetProducts(t *testing.T) {
 		{ID: 3, Name: "Test Product 3", Price: 39.99},
 	}
 
-	err := PopulateTestData(db, "products", testProducts)
+	err := PopulateTestData(ctx, db, "products", testProducts)
 	require.NoError(t, err)
 
-	products, err := db.GetProducts()
+	products, err := db.GetProducts(ctx)
 	require.NoError(t, err)
 
 	require.Len(t, products, len(testProducts))
@@ -55,7 +55,7 @@ func TestGetProducts(t *testing.T) {
 }
 
 func TestGetProduct(t *testing.T) {
-	db, cleanup := setupEmptyDB(t)
+	db, cleanup, ctx := setupEmptyDB(t)
 	defer cleanup()
 
 	testProducts := []Product{
@@ -64,18 +64,18 @@ func TestGetProduct(t *testing.T) {
 		{ID: 3, Name: "Test Product 3", Price: 39.99},
 	}
 
-	err := PopulateTestData(db, "products", testProducts)
+	err := PopulateTestData(ctx, db, "products", testProducts)
 	require.NoError(t, err)
 
 	for _, tp := range testProducts {
-		p, err := db.GetProduct(tp.ID)
+		p, err := db.GetProduct(ctx, tp.ID)
 		require.NoError(t, err)
 		validateProduct(t, p, tp)
 	}
 }
 
 func TestPostReview(t *testing.T) {
-	db, cleanup := setupEmptyDB(t)
+	db, cleanup, ctx := setupEmptyDB(t)
 	defer cleanup()
 
 	testProducts := []Product{
@@ -84,7 +84,7 @@ func TestPostReview(t *testing.T) {
 		{ID: 3, Name: "Test Product 3", Price: 39.99},
 	}
 
-	err := PopulateTestData(db, "products", testProducts)
+	err := PopulateTestData(ctx, db, "products", testProducts)
 	require.NoError(t, err)
 
 	testReviews := []Review{
@@ -94,16 +94,16 @@ func TestPostReview(t *testing.T) {
 	}
 
 	for _, tr := range testReviews {
-		err := db.PostReview(UserReview{UserId: tr.UserId, ProductID: tr.ProductID, ReviewTitle: tr.ReviewTitle, ReviewContent: tr.ReviewContent, Stars: tr.Stars})
+		err := db.PostReview(ctx, UserReview{UserId: tr.UserId, ProductID: tr.ProductID, ReviewTitle: tr.ReviewTitle, ReviewContent: tr.ReviewContent, Stars: tr.Stars})
 		require.NoError(t, err)
-		r, err := db.getReview(tr.ID)
+		r, err := db.getReview(ctx, tr.ID)
 		require.NoError(t, err)
 		validateReview(t, r, tr)
 	}
 }
 
 func TestGetProductReviews(t *testing.T) {
-	db, cleanup := setupEmptyDB(t)
+	db, cleanup, ctx := setupEmptyDB(t)
 	defer cleanup()
 
 	testProducts := []Product{
@@ -112,7 +112,7 @@ func TestGetProductReviews(t *testing.T) {
 		{ID: 3, Name: "Test Product 3", Price: 39.99},
 	}
 
-	err := PopulateTestData(db, "products", testProducts)
+	err := PopulateTestData(ctx, db, "products", testProducts)
 	require.NoError(t, err)
 
 	testReviews := []Review{
@@ -124,7 +124,7 @@ func TestGetProductReviews(t *testing.T) {
 		{ID: 6, UserId: "1", ProductID: 3, ReviewTitle: "Title 6", ReviewContent: "Content 6", Stars: 3},
 	}
 
-	err = PopulateTestData(db, "reviews", testReviews)
+	err = PopulateTestData(ctx, db, "reviews", testReviews)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -155,7 +155,7 @@ func TestGetProductReviews(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		reviews, err := db.GetProductReviews(tt.productId)
+		reviews, err := db.GetProductReviews(ctx, tt.productId)
 		require.NoError(t, err)
 		assert.Len(t, reviews, len(tt.expected))
 		for i, r := range reviews {
