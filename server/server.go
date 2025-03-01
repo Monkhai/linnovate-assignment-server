@@ -66,7 +66,6 @@ func corsMiddleware(next http.Handler) http.Handler {
 
 		// Handle preflight OPTIONS requests
 		if r.Method == "OPTIONS" {
-			log.Printf("Handling OPTIONS preflight request")
 			w.WriteHeader(http.StatusOK)
 			return
 		}
@@ -98,7 +97,6 @@ func (s *Server) Handler() http.Handler {
 func (s *Server) getProducts(w http.ResponseWriter, r *http.Request) {
 	products, err := s.db.GetProducts(r.Context())
 	if err != nil {
-		log.Printf("Error getting products: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -147,7 +145,6 @@ func (s *Server) getProductReviews(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "product id is required", http.StatusBadRequest)
 		return
 	}
-	log.Printf("Getting product reviews for product id: %s", productId)
 	productIdInt, err := strconv.ParseInt(productId, 10, 64)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
