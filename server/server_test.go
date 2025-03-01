@@ -26,7 +26,6 @@ func setupTestDB(t *testing.T) (*db.DB, func()) {
 	}
 	// Set up test schema and seed data
 	db.InitializeTestDB(t, database)
-	db.SeedTestData(t, database)
 
 	return database, cleanup
 }
@@ -35,31 +34,50 @@ func TestGetProducts(t *testing.T) {
 	database, cleanup := setupTestDB(t)
 	defer cleanup()
 
-	// Create server with test database
 	srv := New(database)
 
-	// Create test request
-	req := httptest.NewRequest(http.MethodGet, "/api/products/", nil)
-	w := httptest.NewRecorder()
+	testProducts := []db.Product{
+		{ID: 1, Name: "Test Product 1", Price: 19.99},
+		{ID: 2, Name: "Test Product 2", Price: 29.99},
+		{ID: 3, Name: "Test Product 3", Price: 39.99},
+	}
 
-	// Serve the request
-	srv.Handler().ServeHTTP(w, req)
-
-	// Check response
-	require.Equal(t, http.StatusOK, w.Code)
-
-	// Verify response body contains products
-	var products []db.Product
-	err := json.NewDecoder(w.Body).Decode(&products)
+	ctx := context.Background()
+	err := db.PopulateTestData(ctx, database, "products", testProducts)
 	require.NoError(t, err)
 
-	// We should have 2 test products
-	assert.Len(t, products, 2)
+	req := httptest.NewRequest(http.MethodGet, "/api/products/", nil)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
 
-	// Verify first product
-	if len(products) > 0 {
-		assert.Equal(t, int64(1), products[0].ID)
-		assert.Equal(t, "Test Product 1", products[0].Name)
-		assert.Equal(t, 19.99, products[0].Price)
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var products []db.Product
+	err = json.NewDecoder(w.Body).Decode(&products)
+	require.NoError(t, err)
+
+	require.Equal(t, len(testProducts), len(products))
+
+	for i, p := range products {
+		validateProduct(t, p, testProducts[i])
 	}
 }
+
+// ===========================================
+// =================HELPERS===================
+// ===========================================
+
+func validateProduct(t *testing.T, p, tp db.Product) {
+	assert.Equal(t, tp.ID, p.ID)
+	assert.Equal(t, tp.Name, p.Name)
+	assert.Equal(t, tp.Price, p.Price)
+}
+
+// func validateReview(t *testing.T, r, tr db.Review) {
+// 	assert.Equal(t, r.ID, tr.ID)
+// 	assert.Equal(t, r.ProductID, tr.ProductID)
+// 	assert.Equal(t, r.UserId, tr.UserId)
+// 	assert.Equal(t, r.ReviewTitle, tr.ReviewTitle)
+// 	assert.Equal(t, r.ReviewContent, tr.ReviewContent)
+// 	assert.Equal(t, r.Stars, tr.Stars)
+// }
