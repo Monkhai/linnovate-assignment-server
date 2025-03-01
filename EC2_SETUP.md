@@ -23,18 +23,6 @@ sudo usermod -a -G docker ec2-user
 exit
 ```
 
-For Ubuntu:
-
-```bash
-sudo apt update
-sudo apt install -y docker.io
-sudo systemctl start docker
-sudo systemctl enable docker
-sudo usermod -a -G docker ubuntu
-# Log out and log back in
-exit
-```
-
 After logging back in:
 
 ```bash
@@ -42,14 +30,18 @@ After logging back in:
 docker --version
 ```
 
-## Step 3: Upload Your Service Account Key
+## Step 3: Upload Your Configuration Files
 
-You'll need to upload your Firebase service account key to the EC2 instance.
+You'll need to upload both your Firebase service account key and your environment configuration to the EC2 instance.
 
 From your local machine:
 
 ```bash
+# Upload the service account key
 scp -i your-key.pem /path/to/local/serviceAccountKey.json ec2-user@your-ec2-public-ip:~/serviceAccountKey.json
+
+# Upload the environment configuration
+scp -i your-key.pem /path/to/local/.env.production ec2-user@your-ec2-public-ip:~/.env.production
 ```
 
 ## Step 4: Pull and Run the Docker Image
@@ -58,9 +50,10 @@ scp -i your-key.pem /path/to/local/serviceAccountKey.json ec2-user@your-ec2-publ
 # Pull the image from Docker Hub
 docker pull yourusername/catalogapi:latest
 
-# Run the container with the service account key mounted
+# Run the container with both configuration files mounted
 docker run -d -p 8080:8080 \
   -v ~/serviceAccountKey.json:/app/serviceAccountKey.json \
+  -v ~/.env.production:/app/.env.production \
   --name catalog-api \
   --restart unless-stopped \
   yourusername/catalogapi:latest
@@ -105,6 +98,22 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+
+        # CORS headers (if needed)
+        add_header 'Access-Control-Allow-Origin' '*' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE' always;
+        add_header 'Access-Control-Allow-Headers' 'Origin, X-Requested-With, Content-Type, Accept, Authorization' always;
+
+        # Handle preflight requests
+        if ($request_method = 'OPTIONS') {
+            add_header 'Access-Control-Allow-Origin' '*';
+            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE';
+            add_header 'Access-Control-Allow-Headers' 'Origin, X-Requested-With, Content-Type, Accept, Authorization';
+            add_header 'Access-Control-Max-Age' 1728000;
+            add_header 'Content-Type' 'text/plain charset=UTF-8';
+            add_header 'Content-Length' 0;
+            return 204;
+        }
     }
 }
 ```
@@ -154,9 +163,10 @@ docker pull yourusername/catalogapi:latest
 docker stop catalog-api
 docker rm catalog-api
 
-# Run the new container with the service account key
+# Run the new container with both configuration files
 docker run -d -p 8080:8080 \
   -v ~/serviceAccountKey.json:/app/serviceAccountKey.json \
+  -v ~/.env.production:/app/.env.production \
   --name catalog-api \
   --restart unless-stopped \
   yourusername/catalogapi:latest

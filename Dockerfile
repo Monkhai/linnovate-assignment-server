@@ -14,6 +14,9 @@ COPY . .
 # Create empty credential file if it doesn't exist (will be mounted in production)
 RUN if [ ! -f serviceAccountKey.json ]; then echo "{}" > serviceAccountKey.json; fi
 
+# Create empty .env.production file if it doesn't exist (will be overridden in production)
+RUN if [ ! -f .env.production ]; then echo "APP_ENV=production\nSERVER_PORT=8080" > .env.production; fi
+
 # Build the application
 RUN go build -o server .
 
@@ -29,7 +32,7 @@ RUN apk --no-cache add ca-certificates
 COPY --from=builder /app/server .
 
 # Copy environment and configuration files
-COPY .env.production ./
+COPY --from=builder /app/.env.production ./
 COPY --from=builder /app/serviceAccountKey.json ./
 
 # Expose the server port (default is 8080 as per .env.production)

@@ -4,45 +4,55 @@
 
 This application uses Docker for deployment. The image is automatically built and pushed to Docker Hub when changes are pushed to the main branch.
 
-### Credentials Management
+### Configuration Files
 
-The application requires a Firebase service account key (`serviceAccountKey.json`) to work properly. For security reasons, this file is not included in the repository. When the Docker image is built, a placeholder empty JSON file is created.
+The application requires two important configuration files:
 
-When deploying the application, you need to provide the actual service account key in one of the following ways:
+1. **Firebase Service Account Key** (`serviceAccountKey.json`)
+2. **Environment Configuration** (`.env.production`)
 
-#### Option 1: Mount the file when running the container
+For security reasons, these files are not included in the repository. When the Docker image is built, placeholder files are created with minimal default values.
+
+When deploying the application, you need to provide the actual files:
+
+#### Option 1: Mount both files when running the container
 
 ```bash
 docker run -d -p 8080:8080 \
   -v /path/to/your/serviceAccountKey.json:/app/serviceAccountKey.json \
+  -v /path/to/your/.env.production:/app/.env.production \
   --name catalog-api \
   yourusername/catalogapi:latest
 ```
 
-#### Option 2: Copy the file into a running container
+#### Option 2: Copy the files into a running container
 
 ```bash
 # Start the container
 docker run -d -p 8080:8080 --name catalog-api yourusername/catalogapi:latest
 
-# Copy the file into the container
+# Copy the files into the container
 docker cp /path/to/your/serviceAccountKey.json catalog-api:/app/serviceAccountKey.json
+docker cp /path/to/your/.env.production catalog-api:/app/.env.production
 
 # Restart the container
 docker restart catalog-api
 ```
 
-### Environment Variables
-
-The application uses environment variables from `.env.production`. If you need to override any of these variables, you can pass them when running the container:
+#### Option 3: Use environment variables instead of .env.production
 
 ```bash
 docker run -d -p 8080:8080 \
+  -v /path/to/your/serviceAccountKey.json:/app/serviceAccountKey.json \
   -e DB_HOST=your-db-host \
   -e DB_PORT=5432 \
   -e DB_USER=your-user \
   -e DB_PASSWORD=your-password \
   -e DB_NAME=your-db-name \
+  -e SERVER_PORT=8080 \
+  -e APP_ENV=production \
+  -e AWS_REGION=your-region \
+  -e AWS_DB_SECRET_NAME=your-secret-name \
   --name catalog-api \
   yourusername/catalogapi:latest
 ```
