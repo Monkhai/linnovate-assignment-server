@@ -38,9 +38,9 @@ func TestGetProducts(t *testing.T) {
 	srv := New(database)
 
 	testProducts := []db.Product{
-		{ID: 1, Name: "Test Product 1", Price: 19.99},
-		{ID: 2, Name: "Test Product 2", Price: 29.99},
-		{ID: 3, Name: "Test Product 3", Price: 39.99},
+		{ID: 1, Name: "Test Product 1", Price: 19.99, Image: "https://via.placeholder.com/150", Description: "Test Description 1"},
+		{ID: 2, Name: "Test Product 2", Price: 29.99, Image: "https://via.placeholder.com/150", Description: "Test Description 2"},
+		{ID: 3, Name: "Test Product 3", Price: 39.99, Image: "https://via.placeholder.com/150", Description: "Test Description 3"},
 	}
 
 	err := db.PopulateTestData(ctx, database, "products", testProducts)
@@ -69,9 +69,9 @@ func TestPostReview(t *testing.T) {
 	srv := New(database)
 
 	testProducts := []db.Product{
-		{ID: 1, Name: "Test Product 1", Price: 19.99},
-		{ID: 2, Name: "Test Product 2", Price: 29.99},
-		{ID: 3, Name: "Test Product 3", Price: 39.99},
+		{ID: 1, Name: "Test Product 1", Price: 19.99, Image: "https://via.placeholder.com/150", Description: "Test Description 1"},
+		{ID: 2, Name: "Test Product 2", Price: 29.99, Image: "https://via.placeholder.com/150", Description: "Test Description 2"},
+		{ID: 3, Name: "Test Product 3", Price: 39.99, Image: "https://via.placeholder.com/150", Description: "Test Description 3"},
 	}
 
 	err := db.PopulateTestData(ctx, database, "products", testProducts)
@@ -116,9 +116,9 @@ func TestGetProductReviews(t *testing.T) {
 	srv := New(database)
 
 	testProducts := []db.Product{
-		{ID: 1, Name: "Test Product 1", Price: 19.99},
-		{ID: 2, Name: "Test Product 2", Price: 29.99},
-		{ID: 3, Name: "Test Product 3", Price: 39.99},
+		{ID: 1, Name: "Test Product 1", Price: 19.99, Image: "https://via.placeholder.com/150", Description: "Test Description 1"},
+		{ID: 2, Name: "Test Product 2", Price: 29.99, Image: "https://via.placeholder.com/150", Description: "Test Description 2"},
+		{ID: 3, Name: "Test Product 3", Price: 39.99, Image: "https://via.placeholder.com/150", Description: "Test Description 3"},
 	}
 	err := db.PopulateTestData(ctx, database, "products", testProducts)
 	require.NoError(t, err)
@@ -191,6 +191,8 @@ func validateProduct(t *testing.T, p, tp db.Product) {
 	assert.Equal(t, tp.ID, p.ID)
 	assert.Equal(t, tp.Name, p.Name)
 	assert.Equal(t, tp.Price, p.Price)
+	assert.Equal(t, tp.Image, p.Image)
+	assert.Equal(t, tp.Description, p.Description)
 }
 
 func validateSafeReview(t *testing.T, r db.SafeReview, tr db.Review) {

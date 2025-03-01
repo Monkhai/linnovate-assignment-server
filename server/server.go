@@ -54,25 +54,51 @@ func authMiddleware(auth *auth.Client, next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+// corsMiddleware adds CORS headers to allow requests from localhost:3000
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Set CORS headers for ALL requests
+		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		w.Header().Set("Access-Control-Max-Age", "86400") // 24 hours
+
+		// Handle preflight OPTIONS requests
+		if r.Method == "OPTIONS" {
+			log.Printf("Handling OPTIONS preflight request")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		// Call the next handler
+		next.ServeHTTP(w, r)
+	})
+}
+
 // setupRoutes configures all the API routes
 func (s *Server) setupRoutes() {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("GET /api/products/", s.getProducts)
-	mux.HandleFunc("POST /api/reviews/", authMiddleware(s.auth, s.postReview))
-	mux.HandleFunc("GET /api/products/{id}/reviews/", s.getProductReviews)
+	// Add routes with and without trailing slash
+	mux.HandleFunc("GET /api/products", s.getProducts)
+	mux.HandleFunc("POST /api/reviews", authMiddleware(s.auth, s.postReview))
+	mux.HandleFunc("GET /api/products/{id}/reviews", s.getProductReviews)
 
-	s.router = mux
+	// Add CORS middleware to the router
+	s.router = corsMiddleware(mux)
 }
 
 // Handler returns the HTTP handler for the server
 func (s *Server) Handler() http.Handler {
-	return s.router
+	// Make extra sure that CORS middleware is applied
+	return corsMiddleware(s.router)
 }
 
 func (s *Server) getProducts(w http.ResponseWriter, r *http.Request) {
 	products, err := s.db.GetProducts(r.Context())
 	if err != nil {
+		log.Printf("Error getting products: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -121,6 +147,7 @@ func (s *Server) getProductReviews(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "product id is required", http.StatusBadRequest)
 		return
 	}
+	log.Printf("Getting product reviews for product id: %s", productId)
 	productIdInt, err := strconv.ParseInt(productId, 10, 64)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -131,9 +158,21 @@ func (s *Server) getProductReviews(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	safeReviews := make([]db.SafeReview, len(reviews))
+	for i, review := range reviews {
+		safeReviews[i] = db.SafeReview{
+			ID:            review.ID,
+			ProductID:     review.ProductID,
+			ReviewTitle:   review.ReviewTitle,
+			ReviewContent: review.ReviewContent,
+			Stars:         review.Stars,
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(reviews)
+	json.NewEncoder(w).Encode(safeReviews)
 }
 
 // ===========================================

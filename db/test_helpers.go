@@ -25,6 +25,8 @@ func InitializeTestDB(t *testing.T, db *DB) {
 			id SERIAL PRIMARY KEY,
 			name TEXT NOT NULL,
 			price FLOAT NOT NULL,
+			image TEXT NOT NULL,
+			description TEXT NOT NULL,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)
 	`)
@@ -45,36 +47,10 @@ func InitializeTestDB(t *testing.T, db *DB) {
 	require.NoError(t, err)
 }
 
-// SeedTestData populates the database with test data
-func SeedTestData(t *testing.T, db *DB) {
-	ctx := context.Background()
-
-	// Clear existing data
-	_, err := db.pool.Exec(ctx, "TRUNCATE products CASCADE")
-	require.NoError(t, err)
-
-	// Insert test products
-	_, err = db.pool.Exec(ctx, `
-		INSERT INTO products (id, name, price, created_at) VALUES
-		(1, 'Test Product 1', 19.99, $1),
-		(2, 'Test Product 2', 29.99, $1)
-	`, time.Now())
-	require.NoError(t, err)
-
-	// Insert test reviews
-	_, err = db.pool.Exec(ctx, `
-		INSERT INTO reviews (user_id, product_id, review_title, review_content, stars, created_at) VALUES
-		('test-user-1', 1, 'Great product', 'I really liked this product', 4.5, $1),
-		('test-user-2', 1, 'Not so great', 'I had some issues with this product', 2.0, $1),
-		('test-user-1', 2, 'Awesome', 'Best purchase ever', 5.0, $1)
-	`, time.Now())
-	require.NoError(t, err)
-}
-
 // CleanupTestDB removes test data from the database
 func CleanupTestDB(t *testing.T, db *DB) {
 	ctx := context.Background()
-	_, err := db.pool.Exec(ctx, "TRUNCATE products CASCADE")
+	_, err := db.pool.Exec(ctx, "TRUNCATE products CASCADE, reviews CASCADE")
 	require.NoError(t, err)
 }
 

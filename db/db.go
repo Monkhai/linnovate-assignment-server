@@ -15,10 +15,12 @@ type DB struct {
 }
 
 type Product struct {
-	ID        int64     `db:"id"`
-	Name      string    `db:"name"`
-	Price     float64   `db:"price"`
-	CreatedAt time.Time `db:"created_at"`
+	ID          int64     `db:"id" json:"id"`
+	Name        string    `db:"name" json:"name"`
+	Price       float64   `db:"price" json:"price"`
+	Image       string    `db:"image" json:"image"`
+	Description string    `db:"description" json:"description"`
+	CreatedAt   time.Time `db:"created_at" json:"created_at"`
 }
 
 type Review struct {
@@ -79,7 +81,7 @@ func (db *DB) HealthCheck(ctx context.Context) error {
 }
 
 func (db *DB) GetProducts(ctx context.Context) ([]Product, error) {
-	rows, err := db.pool.Query(ctx, "SELECT * FROM products ORDER BY $1", "id")
+	rows, err := db.pool.Query(ctx, "SELECT * FROM products ORDER BY id")
 	if err != nil {
 		return nil, fmt.Errorf("failed to query products: %w", err)
 	}
@@ -97,7 +99,7 @@ func (db *DB) GetProducts(ctx context.Context) ([]Product, error) {
 }
 
 func (db *DB) GetProduct(ctx context.Context, id int64) (Product, error) {
-	rows, err := db.pool.Query(ctx, "SELECT id, name, price, created_at FROM products WHERE id = $1", id)
+	rows, err := db.pool.Query(ctx, "SELECT * FROM products WHERE id = $1", id)
 	if err != nil {
 		return Product{}, fmt.Errorf("failed to query product: %w", err)
 	}
@@ -149,26 +151,4 @@ func (db *DB) GetProductReviews(ctx context.Context, productId int64) ([]Review,
 	}
 	return reviews, nil
 
-}
-
-// ===========================================
-// =================HELPERS===================
-// ===========================================
-
-func (db *DB) getReview(ctx context.Context, id int64) (Review, error) {
-	rows, err := db.pool.Query(ctx, "SELECT * FROM reviews WHERE id = $1", id)
-	if err != nil {
-		return Review{}, fmt.Errorf("failed to query product: %w", err)
-	}
-	defer rows.Close()
-
-	if !rows.Next() {
-		return Review{}, fmt.Errorf("product with id %d not found", id)
-	}
-
-	review, err := pgx.RowToStructByName[Review](rows)
-	if err != nil {
-		return Review{}, fmt.Errorf("failed to serialize product: %w", err)
-	}
-	return review, nil
 }
