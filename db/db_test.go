@@ -27,7 +27,7 @@ func setupEmptyDB(t *testing.T) (*DB, func(), context.Context) {
 func TestDB_Connection(t *testing.T) {
 	db, cleanup, ctx := setupEmptyDB(t)
 	defer cleanup()
-	err := db.client.Ping(ctx)
+	err := db.pool.Ping(ctx)
 	require.NoError(t, err)
 }
 
@@ -89,12 +89,12 @@ func TestPostReview(t *testing.T) {
 
 	testReviews := []Review{
 		{ID: 1, UserId: "1", ProductID: 1, ReviewTitle: "Title 1", ReviewContent: "Content 1", Stars: 1},
-		{ID: 2, UserId: "2", ProductID: 2, ReviewTitle: "Title 2", ReviewContent: "Content 2", Stars: 2},
-		{ID: 3, UserId: "3", ProductID: 3, ReviewTitle: "Title 3", ReviewContent: "Content 3", Stars: 3},
+		{ID: 2, UserId: "1", ProductID: 2, ReviewTitle: "Title 2", ReviewContent: "Content 2", Stars: 2},
+		{ID: 3, UserId: "1", ProductID: 3, ReviewTitle: "Title 3", ReviewContent: "Content 3", Stars: 3},
 	}
 
 	for _, tr := range testReviews {
-		err := db.PostReview(ctx, UserReview{UserId: tr.UserId, ProductID: tr.ProductID, ReviewTitle: tr.ReviewTitle, ReviewContent: tr.ReviewContent, Stars: tr.Stars})
+		err := db.PostReview(ctx, ClientReview{ProductID: tr.ProductID, ReviewTitle: tr.ReviewTitle, ReviewContent: tr.ReviewContent, Stars: tr.Stars}, "1")
 		require.NoError(t, err)
 		r, err := db.getReview(ctx, tr.ID)
 		require.NoError(t, err)

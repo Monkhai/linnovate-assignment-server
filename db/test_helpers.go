@@ -1,35 +1,103 @@
 package db
 
 import (
+	"catalogapi/config"
 	"context"
 	"fmt"
 	"reflect"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-// testContainer tracks a test container for cleanup
+// InitializeTestDB initializes the database schema for testing
+func InitializeTestDB(t *testing.T, db *DB) {
+	ctx := context.Background()
+
+	// Create products table if it doesn't exist
+	_, err := db.pool.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS products (
+			id SERIAL PRIMARY KEY,
+			name TEXT NOT NULL,
+			price FLOAT NOT NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)
+	`)
+	require.NoError(t, err)
+
+	// Create reviews table if it doesn't exist
+	_, err = db.pool.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS reviews (
+			id SERIAL PRIMARY KEY,
+			user_id TEXT NOT NULL,
+			product_id INTEGER NOT NULL REFERENCES products(id),
+			review_title TEXT,
+			review_content TEXT,
+			stars INTEGER NOT NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)
+	`)
+	require.NoError(t, err)
+}
+
+// SeedTestData populates the database with test data
+func SeedTestData(t *testing.T, db *DB) {
+	ctx := context.Background()
+
+	// Clear existing data
+	_, err := db.pool.Exec(ctx, "TRUNCATE products CASCADE")
+	require.NoError(t, err)
+
+	// Insert test products
+	_, err = db.pool.Exec(ctx, `
+		INSERT INTO products (id, name, price, created_at) VALUES
+		(1, 'Test Product 1', 19.99, $1),
+		(2, 'Test Product 2', 29.99, $1)
+	`, time.Now())
+	require.NoError(t, err)
+
+	// Insert test reviews
+	_, err = db.pool.Exec(ctx, `
+		INSERT INTO reviews (user_id, product_id, review_title, review_content, stars, created_at) VALUES
+		('test-user-1', 1, 'Great product', 'I really liked this product', 4.5, $1),
+		('test-user-2', 1, 'Not so great', 'I had some issues with this product', 2.0, $1),
+		('test-user-1', 2, 'Awesome', 'Best purchase ever', 5.0, $1)
+	`, time.Now())
+	require.NoError(t, err)
+}
+
+// CleanupTestDB removes test data from the database
+func CleanupTestDB(t *testing.T, db *DB) {
+	ctx := context.Background()
+	_, err := db.pool.Exec(ctx, "TRUNCATE products CASCADE")
+	require.NoError(t, err)
+}
+
 type testContainer struct {
 	container testcontainers.Container
 }
 
-// testContainers keeps track of all containers created for tests
 var testContainers = make(map[*DB]*testContainer)
 
-// NewTestDB creates a new DB backed by a PostgreSQL test container
 func NewTestDB(ctx context.Context) (*DB, error) {
+	cfg, err := config.Load()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load config: %w", err)
+	}
+
 	opts := struct {
 		Database string
 		User     string
 		Password string
 	}{
-		Database: "test_db",
-		User:     "test_user",
-		Password: "test_password",
+		Database: cfg.Database.Name,
+		User:     cfg.Database.User,
+		Password: cfg.Database.Password,
 	}
 
 	req := testcontainers.ContainerRequest{
@@ -51,7 +119,6 @@ func NewTestDB(ctx context.Context) (*DB, error) {
 		return nil, fmt.Errorf("failed to start postgres container: %w", err)
 	}
 
-	// Set up cleanup if something fails
 	containerCleanup := func() {
 		container.Terminate(ctx)
 	}
@@ -74,54 +141,45 @@ func NewTestDB(ctx context.Context) (*DB, error) {
 	connString := fmt.Sprintf("postgres://%s:%s@%s:%s/%s",
 		opts.User, opts.Password, host, port.Port(), opts.Database)
 
-	// Wait a bit to ensure Postgres is ready for connections
 	time.Sleep(time.Second * 2)
 
-	client, err := pgxpool.New(ctx, connString)
+	pool, err := pgxpool.New(ctx, connString)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to postgres: %w", err)
 	}
 
-	// Test the connection
-	if err := client.Ping(ctx); err != nil {
-		client.Close()
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
 		return nil, fmt.Errorf("failed to ping postgres: %w", err)
 	}
 
-	// Apply default migrations for testing
-	if err := applyDefaultMigrations(ctx, client); err != nil {
-		client.Close()
+	if err := applyDefaultMigrations(ctx, pool); err != nil {
+		pool.Close()
 		return nil, fmt.Errorf("failed to apply migrations: %w", err)
 	}
 
-	// Create a regular DB instance
-	db := New(client)
+	db := &DB{pool: pool}
 
-	// Track the container for later cleanup
 	testContainers[db] = &testContainer{container: container}
 
 	return db, nil
 }
 
-// CloseTestDB properly cleans up a test database including its container
 func CloseTestDB(ctx context.Context, db *DB) {
 	if db == nil {
 		return
 	}
 
-	// First close the database connection
-	if db.client != nil {
-		db.client.Close()
+	if db.pool != nil {
+		db.pool.Close()
 	}
 
-	// Then terminate the container if this was a test DB
 	if tc, exists := testContainers[db]; exists && tc.container != nil {
 		tc.container.Terminate(ctx)
 		delete(testContainers, db)
 	}
 }
 
-// PopulateTestData populates a table with test data for testing purposes
 func PopulateTestData(ctx context.Context, db *DB, tableName string, data any) error {
 	val := reflect.ValueOf(data)
 	if val.Kind() != reflect.Slice {
@@ -131,7 +189,7 @@ func PopulateTestData(ctx context.Context, db *DB, tableName string, data any) e
 		return nil
 	}
 
-	tx, err := db.client.Begin(ctx)
+	tx, err := db.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}

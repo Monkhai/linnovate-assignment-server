@@ -9,8 +9,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// DB represents the database connection pool
 type DB struct {
-	client *pgxpool.Pool
+	pool *pgxpool.Pool
 }
 
 type Product struct {
@@ -30,26 +31,48 @@ type Review struct {
 	CreatedAt     time.Time `db:"created_at"`
 }
 
-type UserReview struct {
-	UserId        string  `json:"userId"`
+type ClientReview struct {
 	ProductID     int64   `json:"productId"`
 	ReviewTitle   string  `json:"reviewTitle"`
 	ReviewContent string  `json:"reviewContent"`
 	Stars         float64 `json:"stars"`
 }
 
-func New(client *pgxpool.Pool) *DB {
-	return &DB{client: client}
+// New creates a new database connection pool
+func New(databaseURL string) (*DB, error) {
+	config, err := pgxpool.ParseConfig(databaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse database URL: %w", err)
+	}
+
+	pool, err := pgxpool.NewWithConfig(context.Background(), config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create connection pool: %w", err)
+	}
+
+	// Test the connection
+	if err := pool.Ping(context.Background()); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("failed to ping database: %w", err)
+	}
+
+	return &DB{pool: pool}, nil
 }
 
-func (db *DB) Close(ctx context.Context) {
-	if db.client != nil {
-		db.client.Close()
+// Close closes the database connection pool
+func (db *DB) Close() {
+	if db.pool != nil {
+		db.pool.Close()
 	}
 }
 
+// HealthCheck checks if the database connection is healthy
+func (db *DB) HealthCheck(ctx context.Context) error {
+	return db.pool.Ping(ctx)
+}
+
 func (db *DB) GetProducts(ctx context.Context) ([]Product, error) {
-	rows, err := db.client.Query(ctx, "SELECT * FROM products ORDER BY $1", "id")
+	rows, err := db.pool.Query(ctx, "SELECT * FROM products ORDER BY $1", "id")
 	if err != nil {
 		return nil, fmt.Errorf("failed to query products: %w", err)
 	}
@@ -67,7 +90,7 @@ func (db *DB) GetProducts(ctx context.Context) ([]Product, error) {
 }
 
 func (db *DB) GetProduct(ctx context.Context, id int64) (Product, error) {
-	rows, err := db.client.Query(ctx, "SELECT id, name, price, created_at FROM products WHERE id = $1", id)
+	rows, err := db.pool.Query(ctx, "SELECT id, name, price, created_at FROM products WHERE id = $1", id)
 	if err != nil {
 		return Product{}, fmt.Errorf("failed to query product: %w", err)
 	}
@@ -84,11 +107,11 @@ func (db *DB) GetProduct(ctx context.Context, id int64) (Product, error) {
 	return product, nil
 }
 
-func (db *DB) PostReview(ctx context.Context, review UserReview) error {
-	_, err := db.client.Exec(ctx,
+func (db *DB) PostReview(ctx context.Context, review ClientReview, userId string) error {
+	_, err := db.pool.Exec(ctx,
 		`INSERT INTO reviews (user_id, product_id, review_title, review_content, stars) 
 		VALUES ($1, $2, $3, $4, $5)`,
-		review.UserId, review.ProductID, review.ReviewTitle, review.ReviewContent, review.Stars)
+		userId, review.ProductID, review.ReviewTitle, review.ReviewContent, review.Stars)
 	if err != nil {
 		return fmt.Errorf("failed to insert review: %w", err)
 	}
@@ -96,7 +119,7 @@ func (db *DB) PostReview(ctx context.Context, review UserReview) error {
 }
 
 func (db *DB) GetProductReviews(ctx context.Context, productId int64) ([]Review, error) {
-	rows, err := db.client.Query(ctx, `
+	rows, err := db.pool.Query(ctx, `
 	SELECT * FROM reviews WHERE product_id = $1
 	`, productId)
 
@@ -122,7 +145,7 @@ func (db *DB) GetProductReviews(ctx context.Context, productId int64) ([]Review,
 // ===========================================
 
 func (db *DB) getReview(ctx context.Context, id int64) (Review, error) {
-	rows, err := db.client.Query(ctx, "SELECT * FROM reviews WHERE id = $1", id)
+	rows, err := db.pool.Query(ctx, "SELECT * FROM reviews WHERE id = $1", id)
 	if err != nil {
 		return Review{}, fmt.Errorf("failed to query product: %w", err)
 	}
