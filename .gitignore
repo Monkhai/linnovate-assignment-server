@@ -33,12 +33,11 @@ ehthumbs.db
 Thumbs.db
 
 # Environment variables
-.env
-.env.*
+.env.production
 
 # Log files
 *.log
-
+!.env.test
 # Build directory
 build/
 bin/ 
