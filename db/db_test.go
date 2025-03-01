@@ -94,9 +94,7 @@ func TestPostReview(t *testing.T) {
 	}
 
 	for _, tr := range testReviews {
-		err := db.PostReview(ctx, ClientReview{ProductID: tr.ProductID, ReviewTitle: tr.ReviewTitle, ReviewContent: tr.ReviewContent, Stars: tr.Stars}, "1")
-		require.NoError(t, err)
-		r, err := db.getReview(ctx, tr.ID)
+		r, err := db.PostReview(ctx, ClientReview{ProductID: tr.ProductID, ReviewTitle: tr.ReviewTitle, ReviewContent: tr.ReviewContent, Stars: tr.Stars}, "1")
 		require.NoError(t, err)
 		validateReview(t, r, tr)
 	}
@@ -111,7 +109,6 @@ func TestGetProductReviews(t *testing.T) {
 		{ID: 2, Name: "Test Product 2", Price: 29.99},
 		{ID: 3, Name: "Test Product 3", Price: 39.99},
 	}
-
 	err := PopulateTestData(ctx, db, "products", testProducts)
 	require.NoError(t, err)
 
@@ -123,7 +120,6 @@ func TestGetProductReviews(t *testing.T) {
 		{ID: 5, UserId: "1", ProductID: 3, ReviewTitle: "Title 5", ReviewContent: "Content 5", Stars: 2},
 		{ID: 6, UserId: "1", ProductID: 3, ReviewTitle: "Title 6", ReviewContent: "Content 6", Stars: 3},
 	}
-
 	err = PopulateTestData(ctx, db, "reviews", testReviews)
 	require.NoError(t, err)
 

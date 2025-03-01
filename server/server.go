@@ -15,6 +15,12 @@ import (
 	"google.golang.org/api/option"
 )
 
+// Custom context key type to avoid collisions
+type contextKey string
+
+// Define key constants
+const userIDKey contextKey = "userID"
+
 // Server represents the HTTP server and its dependencies
 type Server struct {
 	router http.Handler
@@ -36,12 +42,24 @@ func New(database *db.DB) *Server {
 	return s
 }
 
+func authMiddleware(auth *auth.Client, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, err := authorize(auth, r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
+		ctx := context.WithValue(r.Context(), userIDKey, userID)
+		next(w, r.WithContext(ctx))
+	}
+}
+
 // setupRoutes configures all the API routes
 func (s *Server) setupRoutes() {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/products/", s.getProducts)
-	mux.HandleFunc("POST /api/reviews/", s.postReview)
+	mux.HandleFunc("POST /api/reviews/", authMiddleware(s.auth, s.postReview))
 	mux.HandleFunc("GET /api/products/{id}/reviews/", s.getProductReviews)
 
 	s.router = mux
@@ -59,38 +77,50 @@ func (s *Server) getProducts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(products)
-	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(products)
 }
 
 func (s *Server) postReview(w http.ResponseWriter, r *http.Request) {
-	userId, err := authorize(s.auth, r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
+	userId, ok := r.Context().Value(userIDKey).(string)
+	if !ok {
+		http.Error(w, "user not found in context", http.StatusUnauthorized)
 		return
 	}
 
-	var review db.ClientReview
-	err = json.NewDecoder(r.Body).Decode(&review)
+	var clientReview db.ClientReview
+	err := json.NewDecoder(r.Body).Decode(&clientReview)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	err = s.db.PostReview(r.Context(), review, userId)
+	review, err := s.db.PostReview(r.Context(), clientReview, userId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
+	safeReview := db.SafeReview{
+		ID:            review.ID,
+		ProductID:     clientReview.ProductID,
+		ReviewTitle:   clientReview.ReviewTitle,
+		ReviewContent: clientReview.ReviewContent,
+		Stars:         clientReview.Stars,
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(review)
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(safeReview)
 }
 
 func (s *Server) getProductReviews(w http.ResponseWriter, r *http.Request) {
-	productId := r.URL.Query().Get("productId")
+	productId := r.PathValue("id")
+	if productId == "" {
+		http.Error(w, "product id is required", http.StatusBadRequest)
+		return
+	}
 	productIdInt, err := strconv.ParseInt(productId, 10, 64)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -101,9 +131,9 @@ func (s *Server) getProductReviews(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(reviews)
-	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(reviews)
 }
 
 // ===========================================

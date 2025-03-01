@@ -37,6 +37,13 @@ type ClientReview struct {
 	ReviewContent string  `json:"reviewContent"`
 	Stars         float64 `json:"stars"`
 }
+type SafeReview struct {
+	ID            int64   `json:"id"`
+	ProductID     int64   `json:"productId"`
+	ReviewTitle   string  `json:"reviewTitle"`
+	ReviewContent string  `json:"reviewContent"`
+	Stars         float64 `json:"stars"`
+}
 
 // New creates a new database connection pool
 func New(databaseURL string) (*DB, error) {
@@ -107,15 +114,19 @@ func (db *DB) GetProduct(ctx context.Context, id int64) (Product, error) {
 	return product, nil
 }
 
-func (db *DB) PostReview(ctx context.Context, review ClientReview, userId string) error {
-	_, err := db.pool.Exec(ctx,
+func (db *DB) PostReview(ctx context.Context, review ClientReview, userId string) (Review, error) {
+	var newReview Review
+	err := db.pool.QueryRow(ctx,
 		`INSERT INTO reviews (user_id, product_id, review_title, review_content, stars) 
-		VALUES ($1, $2, $3, $4, $5)`,
-		userId, review.ProductID, review.ReviewTitle, review.ReviewContent, review.Stars)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING id, user_id, product_id, review_title, review_content, stars, created_at`,
+		userId, review.ProductID, review.ReviewTitle, review.ReviewContent, review.Stars).Scan(
+		&newReview.ID, &newReview.UserId, &newReview.ProductID, &newReview.ReviewTitle,
+		&newReview.ReviewContent, &newReview.Stars, &newReview.CreatedAt)
 	if err != nil {
-		return fmt.Errorf("failed to insert review: %w", err)
+		return Review{}, fmt.Errorf("failed to insert review: %w", err)
 	}
-	return nil
+	return newReview, nil
 }
 
 func (db *DB) GetProductReviews(ctx context.Context, productId int64) ([]Review, error) {
