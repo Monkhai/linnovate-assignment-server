@@ -20,6 +20,7 @@ sudo systemctl start docker
 sudo systemctl enable docker
 sudo usermod -a -G docker ec2-user
 # Log out and log back in
+exit
 ```
 
 For Ubuntu:
@@ -31,22 +32,47 @@ sudo systemctl start docker
 sudo systemctl enable docker
 sudo usermod -a -G docker ubuntu
 # Log out and log back in
+exit
 ```
 
-## Step 3: Pull and Run the Docker Image
+After logging back in:
+
+```bash
+# Verify Docker is working
+docker --version
+```
+
+## Step 3: Upload Your Service Account Key
+
+You'll need to upload your Firebase service account key to the EC2 instance.
+
+From your local machine:
+
+```bash
+scp -i your-key.pem /path/to/local/serviceAccountKey.json ec2-user@your-ec2-public-ip:~/serviceAccountKey.json
+```
+
+## Step 4: Pull and Run the Docker Image
 
 ```bash
 # Pull the image from Docker Hub
 docker pull yourusername/catalogapi:latest
 
-# Run the container
-docker run -d -p 8080:8080 --name catalog-api yourusername/catalogapi:latest
+# Run the container with the service account key mounted
+docker run -d -p 8080:8080 \
+  -v ~/serviceAccountKey.json:/app/serviceAccountKey.json \
+  --name catalog-api \
+  --restart unless-stopped \
+  yourusername/catalogapi:latest
 
 # Check if it's running
 docker ps
+
+# Check logs
+docker logs catalog-api
 ```
 
-## Step 4: Setup Nginx (if needed)
+## Step 5: Setup Nginx (if needed)
 
 Install and configure Nginx as a reverse proxy:
 
@@ -77,6 +103,8 @@ server {
         proxy_pass http://localhost:8080;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
 ```
@@ -88,7 +116,7 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-## Step 5: Check Access
+## Step 6: Check Access
 
 Access your API at `http://your-ec2-public-ip/`
 
@@ -113,3 +141,23 @@ Access your API at `http://your-ec2-public-ip/`
    ```
 
 4. Make sure your RDS security group allows connections from your EC2 instance.
+
+## Updating Your Deployment
+
+When a new Docker image is available:
+
+```bash
+# Pull the latest image
+docker pull yourusername/catalogapi:latest
+
+# Stop and remove the current container
+docker stop catalog-api
+docker rm catalog-api
+
+# Run the new container with the service account key
+docker run -d -p 8080:8080 \
+  -v ~/serviceAccountKey.json:/app/serviceAccountKey.json \
+  --name catalog-api \
+  --restart unless-stopped \
+  yourusername/catalogapi:latest
+```
