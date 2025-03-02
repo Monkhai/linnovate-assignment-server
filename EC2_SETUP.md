@@ -4,21 +4,25 @@ This is a simplified guide for deploying the Docker image to AWS EC2.
 
 ## Step 1: Launch an EC2 Instance
 
-1. Launch an EC2 instance (Amazon Linux 2 or Ubuntu)
+1. Launch an EC2 instance (Amazon Linux 2, Amazon Linux 2023, or Ubuntu)
 2. Configure security group to allow:
    - SSH (port 22) from your IP
    - HTTP (port 80) from anywhere
 
 ## Step 2: Install Docker on EC2
 
-For Amazon Linux 2:
+### For Amazon Linux 2023 (AL2023)
 
 ```bash
-sudo yum update -y
-sudo amazon-linux-extras install docker -y
+# Update packages
+sudo dnf update -y
+
+# Install Docker
+sudo dnf install -y docker
 sudo systemctl start docker
 sudo systemctl enable docker
 sudo usermod -a -G docker ec2-user
+
 # Log out and log back in
 exit
 ```
@@ -30,7 +34,18 @@ After logging back in:
 docker --version
 ```
 
-## Step 3: Upload Your Configuration Files
+## Step 3: Install Docker Compose (Optional)
+
+```bash
+# Download and install Docker Compose
+sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+
+# Verify installation
+docker-compose --version
+```
+
+## Step 4: Upload Your Configuration Files
 
 You'll need to upload both your Firebase service account key and your environment configuration to the EC2 instance.
 
@@ -44,7 +59,7 @@ scp -i your-key.pem /path/to/local/serviceAccountKey.json ec2-user@your-ec2-publ
 scp -i your-key.pem /path/to/local/.env.production ec2-user@your-ec2-public-ip:~/.env.production
 ```
 
-## Step 4: Pull and Run the Docker Image
+## Step 5: Pull and Run the Docker Image
 
 ```bash
 # Pull the image from Docker Hub
@@ -65,22 +80,38 @@ docker ps
 docker logs catalog-api
 ```
 
-## Step 5: Setup Nginx (if needed)
+## Step 6: Setup Nginx (if needed)
 
-Install and configure Nginx as a reverse proxy:
+### For Amazon Linux 2023 (AL2023)
 
 ```bash
 # Install Nginx
-# For Amazon Linux 2
-sudo amazon-linux-extras install nginx1 -y
-
-# For Ubuntu
-sudo apt install -y nginx
-
-# Start and enable Nginx
+sudo dnf install -y nginx
 sudo systemctl start nginx
 sudo systemctl enable nginx
+```
 
+### For Amazon Linux 2
+
+```bash
+# Install Nginx
+sudo amazon-linux-extras install nginx1 -y
+sudo systemctl start nginx
+sudo systemctl enable nginx
+```
+
+### For Ubuntu
+
+```bash
+# Install Nginx
+sudo apt install -y nginx
+sudo systemctl start nginx
+sudo systemctl enable nginx
+```
+
+Configure Nginx as a reverse proxy:
+
+```bash
 # Create a config file
 sudo nano /etc/nginx/conf.d/api.conf
 ```
@@ -125,7 +156,7 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-## Step 6: Check Access
+## Step 7: Check Access
 
 Access your API at `http://your-ec2-public-ip/`
 
@@ -150,6 +181,19 @@ Access your API at `http://your-ec2-public-ip/`
    ```
 
 4. Make sure your RDS security group allows connections from your EC2 instance.
+5. If you have firewall issues:
+
+   ```bash
+   # For Amazon Linux/CentOS/RHEL
+   sudo systemctl status firewalld
+   sudo firewall-cmd --add-port=80/tcp --permanent
+   sudo firewall-cmd --add-port=8080/tcp --permanent
+   sudo firewall-cmd --reload
+
+   # For Ubuntu
+   sudo ufw allow 80/tcp
+   sudo ufw allow 8080/tcp
+   ```
 
 ## Updating Your Deployment
 

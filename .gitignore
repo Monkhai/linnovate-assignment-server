@@ -44,6 +44,4 @@ bin/
 
 # Firebase service account key
 **/serviceAccountKey.json
-
-# VSCode settings
-# settings.json
+build-local.sh
