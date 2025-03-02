@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 
@@ -108,10 +109,12 @@ func loadDatabaseConfigFromEnv(env string) DatabaseConfig {
 }
 
 func (c *DatabaseConfig) GetDatabaseURL() string {
-	return fmt.Sprintf(
+	password := url.QueryEscape(c.Password)
+	url := fmt.Sprintf(
 		"postgres://%s:%s@%s:%d/%s?sslmode=%s",
-		c.User, c.Password, c.Host, c.Port, c.Name, c.SSLMode,
+		c.User, password, c.Host, c.Port, c.Name, c.SSLMode,
 	)
+	return url
 }
 
 func loadDatabaseSecretFromAWS(region, secretName string) (string, string, error) {
@@ -134,10 +137,9 @@ func loadDatabaseSecretFromAWS(region, secretName string) (string, string, error
 	}
 	// Decrypts secret using the associated KMS key.
 	var secretString string = *result.SecretString
-
 	//parse from json {hostname: string, password: string} to struct
 	var secret struct {
-		Username string `json:"hostname"`
+		Username string `json:"username"`
 		Password string `json:"password"`
 	}
 	err = json.Unmarshal([]byte(secretString), &secret)
