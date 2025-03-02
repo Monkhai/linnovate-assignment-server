@@ -21,12 +21,13 @@ func main() {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
-	log.Printf("Starting application in %s mode", cfg.Environment)
+	log.Printf("Starting application in %s mode\n", cfg.Environment)
 
 	database, err := db.New(cfg.Database.GetDatabaseURL())
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
+	log.Println("Connected to database")
 	defer database.Close()
 
 	srv := server.New(database)
@@ -34,9 +35,10 @@ func main() {
 		Addr:    ":" + strconv.Itoa(cfg.Server.Port),
 		Handler: srv.Handler(),
 	}
+	log.Println("Server created")
 
 	go func() {
-		log.Printf("Server listening on port %d", cfg.Server.Port)
+		log.Printf("Server listening on port %d\n", cfg.Server.Port)
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Server failed to start: %v", err)
 		}
