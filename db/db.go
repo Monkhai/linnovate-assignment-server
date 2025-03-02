@@ -49,22 +49,32 @@ type SafeReview struct {
 
 // New creates a new database connection pool
 func New(databaseURL string) (*DB, error) {
+	fmt.Println("Parsing database configuration...")
 	config, err := pgxpool.ParseConfig(databaseURL)
 	if err != nil {
+		fmt.Printf("Failed to parse database URL: %v\n", err)
 		return nil, fmt.Errorf("failed to parse database URL: %w", err)
 	}
+	fmt.Println("Successfully parsed database configuration")
 
+	fmt.Println("Creating connection pool...")
 	pool, err := pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {
+		fmt.Printf("Failed to create connection pool: %v\n", err)
 		return nil, fmt.Errorf("failed to create connection pool: %w", err)
 	}
+	fmt.Println("Successfully created connection pool")
 
-	// Test the connection
+	fmt.Println("Testing database connection with ping...")
 	if err := pool.Ping(context.Background()); err != nil {
+		fmt.Printf("Failed to ping database: %v\n", err)
+		fmt.Println("Closing connection pool due to failed ping")
 		pool.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
+	fmt.Println("Successfully pinged database")
 
+	fmt.Println("Database connection successfully established")
 	return &DB{pool: pool}, nil
 }
 
