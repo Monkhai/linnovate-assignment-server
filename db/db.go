@@ -66,7 +66,9 @@ func New(databaseURL string) (*DB, error) {
 	fmt.Println("Successfully created connection pool")
 
 	fmt.Println("Testing database connection with ping...")
-	if err := pool.Ping(context.Background()); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := pool.Ping(ctx); err != nil {
 		fmt.Printf("Failed to ping database: %v\n", err)
 		fmt.Println("Closing connection pool due to failed ping")
 		pool.Close()
