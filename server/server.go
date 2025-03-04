@@ -58,7 +58,7 @@ func authMiddleware(auth *auth.Client, next http.HandlerFunc) http.HandlerFunc {
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Set CORS headers for ALL requests
-		w.Header().Set("Access-Control-Allow-Origin", "https://linnovate-assignment-web-y1bf.vercel.app")
+		w.Header().Set("Access-Control-Allow-Origin", "https://linnovate-assignment-web.vercel.app")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
